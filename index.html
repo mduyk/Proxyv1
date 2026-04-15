@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DELTA RSL - SHOP 1</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        :root { --bg: #0d0d16; --card: #161625; --cyan: #00f2ff; --gold: #ffcc00; --red: #ff4444; --green: #00ff88; --purple: #bf5af2; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; padding: 15px; margin: 0; }
+        .box { background: var(--card); padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444; background: #000; color: #fff; box-sizing: border-box; outline: none; }
+        button { border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; }
+        .btn-main { background: var(--cyan); color: #000; }
+        .btn-nap { background: var(--gold); color: #000; margin-top: 10px; }
+        .balance { color: var(--gold); font-size: 24px; font-weight: bold; }
+        .hist-table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 10px; }
+        .hist-table td { padding: 8px; border-bottom: 1px solid #222; }
+        .st-success { color: var(--green); }
+        .st-pending { color: var(--gold); }
+        .st-fail { color: var(--red); }
+        .qr-area { text-align: center; background: #000; padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid var(--cyan); display: none; }
+        .section-title { font-size: 12px; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; color: #888; }
+        .search-icon { cursor: pointer; background: #333; padding: 2px 8px; border-radius: 4px; font-size: 10px; color: #fff; }
+        #full-key-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:99; overflow-y:auto; padding:20px; box-sizing:border-box; }
+        #loading-qr { color: var(--cyan); font-size: 12px; margin: 10px 0; display: none; }
+    </style>
+</head>
+<body>
+
+<div id="full-key-modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom: 1px solid #333; padding-bottom: 10px;">
+        <h3 style="color:var(--cyan); margin:0;">KHO KEY ĐÃ MUA</h3>
+        <button onclick="closeModal()" style="width:auto; padding:5px 15px; background:var(--red); color:white;">Đóng</button>
+    </div>
+    <table class="hist-table"><tbody id="modal-key-body"></tbody></table>
+</div>
+
+<div style="max-width: 450px; margin: auto;">
+    <h2 style="text-align:center; color: var(--cyan);">DELTA RSL - SHOP 1</h2>
+
+    <div id="auth-area" class="box">
+        <input type="text" id="auth-user" placeholder="Tài khoản...">
+        <input type="password" id="auth-pass" placeholder="Mật khẩu...">
+        <button class="btn-main" onclick="handleAuth('login')">ĐĂNG NHẬP</button>
+    </div>
+
+    <div id="user-area" class="box" style="display:none;">
+        <div style="display:flex; justify-content:space-between;">
+            <span>ID: <b id="display-name" style="color:var(--cyan)"></b></span>
+            <span onclick="logout()" style="color:#555; cursor:pointer; font-size:11px">[Thoát]</span>
+        </div>
+        <div style="margin: 10px 0;">Ví: <span class="balance" id="user-balance">0</span> VNĐ</div>
+        
+        <div id="nap-input-group">
+            <input type="number" id="nap-amount" placeholder="Số tiền nạp...">
+            <div id="loading-qr">⏳ Vui lòng đợi 1-3 giây để hệ thống tải mã QR...</div>
+            <button class="btn-nap" id="btn-show-qr" onclick="showQR()">TIẾP TỤC NẠP</button>
+        </div>
+
+        <div id="qr-container" class="qr-area">
+            <img id="qr-img" src="" style="width: 150px; border-radius: 10px;" onload="document.getElementById('loading-qr').style.display='none'">
+            <div style="margin:8px 0; font-size:13px;">Nội dung: <b id="memo-txt" style="color:var(--gold)"></b></div>
+            <button class="btn-main" onclick="confirmDeposit()">XÁC NHẬN ĐÃ CHUYỂN</button>
+            <button onclick="backToInput()" style="background:none; color:#555; font-size:11px; margin-top:10px; width:100%">QUAY LẠI</button>
+        </div>
+    </div>
+
+    <div class="box">
+        <span class="section-title">🎲 RANDOM & KEY</span>
+        <div id="list-r-tuan"></div>
+        <div id="list-r-thang" style="margin: 8px 0;"></div>
+        <div id="list-r-nam"></div>
+        <hr style="border:0; border-top:1px solid #333; margin:15px 0;">
+        <div id="list-ngay"></div>
+        <div id="list-tuan" style="margin: 8px 0;"></div>
+        <div id="list-thang" style="margin-bottom: 8px;"></div>
+        <div id="list-nam"></div>
+    </div>
+
+    <div class="box">
+        <span class="section-title">🕒 LỊCH SỬ NẠP</span>
+        <table class="hist-table"><tbody id="hist-pay"></tbody></table>
+    </div>
+
+    <div class="box">
+        <div class="section-title">
+            <span>🔑 5 GIAO DỊCH GẦN NHẤT</span>
+            <span class="search-icon" onclick="openModal()">🔍 KHO KEY</span>
+        </div>
+        <table class="hist-table"><tbody id="hist-key-recent"></tbody></table>
+    </div>
+</div>
+
+<script>
+    const config = {
+        apiKey: "AIzaSyBk6R1TDZeAxh37JQLgL_6Wl0v8m8Sg0",
+        authDomain: "shopctv-61f96.firebaseapp.com",
+        databaseURL: "https://shopctv-61f96-default-rtdb.asia-southeast1.firebasedatabase.app/", 
+        projectId: "shopctv-61f96",
+        appId: "1:610663182342:web:83e255ec7921609395f190"
+    };
+    firebase.initializeApp(config);
+    const db = firebase.database();
+    let currentUser = null;
+
+    function handleAuth(type) {
+        const u = document.getElementById('auth-user').value.trim().toLowerCase();
+        const p = document.getElementById('auth-pass').value.trim();
+        if(!u || !p) return;
+        db.ref('users_shop1/'+u).once('value', s => {
+            if(s.val() && s.val().password == p) enterShop(u); else alert("Sai thông tin!");
+        });
+    }
+
+    function enterShop(u) {
+        currentUser = u;
+        document.getElementById('auth-area').style.display='none';
+        document.getElementById('user-area').style.display='block';
+        document.getElementById('display-name').innerText = u;
+        
+        db.ref('users_shop1/'+u+'/balance').off();
+        db.ref('users_shop1/'+u+'/balance').on('value', s => { document.getElementById('user-balance').innerText = (s.val()||0).toLocaleString(); });
+        
+        db.ref('history_pay/'+u).off();
+        db.ref('history_pay/'+u).on('value', s => {
+            const b = document.getElementById('hist-pay'); b.innerHTML = "";
+            s.forEach(child => {
+                const d = child.val();
+                let cls = d.status === 'Success' ? 'st-success' : (d.status === 'Fail' ? 'st-fail' : 'st-pending');
+                let txt = d.status === 'Success' ? 'Thành công' : (d.status === 'Fail' ? 'Thất bại' : 'Đang xử lý');
+                b.innerHTML = `<tr><td>${d.time}</td><td>${Number(d.amount).toLocaleString()}đ</td><td class="${cls}">${txt}</td></tr>` + b.innerHTML;
+            });
+        });
+
+        db.ref('history_keys/'+u).off();
+        db.ref('history_keys/'+u).on('value', s => {
+            const recent = document.getElementById('hist-key-recent');
+            const modal = document.getElementById('modal-key-body');
+            recent.innerHTML = ""; modal.innerHTML = "";
+            let allLogs = [];
+            s.forEach(child => { allLogs.push(child.val()); });
+            allLogs.reverse();
+            allLogs.slice(0, 5).forEach(k => {
+                recent.innerHTML += `<tr><td>${k.time}</td><td style="color:${k.key.includes('Hụt') ? '#555' : 'var(--cyan)'}">${k.key}</td></tr>`;
+            });
+            const cleanKeys = allLogs.filter(k => !k.key.includes("Hụt") && !k.key.includes("may mắn"));
+            cleanKeys.forEach(k => {
+                modal.innerHTML += `<tr><td>${k.time}</td><td style="color:var(--green); font-weight:bold;">${k.key}</td></tr>`;
+            });
+        });
+    }
+
+    function showQR() {
+        const amt = document.getElementById('nap-amount').value;
+        if(!amt || amt < 1000) return alert("Tối thiểu 1.000đ");
+        
+        document.getElementById('loading-qr').style.display = 'block';
+        document.getElementById('btn-show-qr').disabled = true;
+
+        setTimeout(() => {
+            document.getElementById('memo-txt').innerText = "NAP " + currentUser;
+            document.getElementById('qr-img').src = `https://img.vietqr.io/image/MB-0588807300000-compact2.png?amount=${amt}&addInfo=NAP%20${currentUser}`;
+            document.getElementById('qr-container').style.display = 'block';
+            document.getElementById('nap-input-group').style.display = 'none';
+            document.getElementById('btn-show-qr').disabled = false;
+        }, 1500); 
+    }
+
+    function backToInput() {
+        document.getElementById('qr-container').style.display = 'none';
+        document.getElementById('nap-input-group').style.display = 'block';
+        document.getElementById('loading-qr').style.display = 'none';
+    }
+
+    function confirmDeposit() {
+        const amt = document.getElementById('nap-amount').value;
+        const time = new Date().toLocaleTimeString();
+        const rid = db.ref('bank_requests').push().key;
+        db.ref('bank_requests/'+rid).set({ user: currentUser, amount: amt, shop: 'users_shop1', time: time, id: rid, status: 'Pending' });
+        db.ref('history_pay/'+currentUser+'/'+rid).set({ time: time, amount: amt, status: 'Pending' });
+        
+        alert("Đã gửi thông báo cho Admin! Vui lòng đợi xử lý.");
+        backToInput();
+        document.getElementById('nap-amount').value = "";
+    }
+
+    function execRandom(mode, price, lmt, target) {
+        db.ref('users_shop1/'+currentUser+'/balance').once('value', s => {
+            const b = s.val()||0;
+            if(b < price) return alert("Không đủ tiền!");
+            db.ref('sys/v1/'+mode).transaction(c => (c || 0) + 1, (err, comm, snap) => {
+                const val = snap.val();
+                db.ref('users_shop1/'+currentUser+'/balance').set(b - price);
+                const t = new Date().toLocaleTimeString();
+                let win = (mode === 'r3') ? (Math.random() < 0.02) : (val % lmt === 0);
+                if(win) {
+                    db.ref('keys/shop1/'+target).limitToFirst(1).once('value', k => {
+                        if(!k.val()) db.ref('history_keys/'+currentUser).push({ key: "Hụt rồi!", time: t });
+                        else {
+                            const kid = Object.keys(k.val())[0];
+                            const kv = k.val()[kid];
+                            db.ref('keys/shop1/'+target+'/'+kid).remove();
+                            db.ref('history_keys/'+currentUser).push({ key: kv, time: t });
+                            alert("CHÚC MỪNG: " + kv);
+                        }
+                    });
+                } else db.ref('history_keys/'+currentUser).push({ key: "Hụt rồi!", time: t });
+            });
+        });
+    }
+
+    function buyNormal(path, price) {
+        db.ref('users_shop1/'+currentUser+'/balance').once('value', s => {
+            const b = s.val()||0;
+            if(b < price) return alert("Không đủ tiền!");
+            db.ref('keys/shop1/'+path).limitToFirst(1).once('value', k => {
+                if(!k.val()) return alert("Hết hàng!");
+                const kid = Object.keys(k.val())[0];
+                const kv = k.val()[kid];
+                db.ref('users_shop1/'+currentUser+'/balance').set(b - price);
+                db.ref('keys/shop1/'+path+'/'+kid).remove();
+                db.ref('history_keys/'+currentUser).push({ key: kv, time: new Date().toLocaleTimeString() });
+                alert("Mua thành công!");
+            });
+        });
+    }
+
+    function render(p, id, pr, lb, isR, lmt, target) {
+        const action = isR ? `execRandom('${p}', ${pr}, ${lmt}, '${target}')` : `buyNormal('${p}', ${pr})`;
+        document.getElementById(id).innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;"><span>${lb}</span><button onclick="${action}" style="width:110px; padding:7px; background:var(--cyan); color:#000; font-size:11px;">${pr.toLocaleString()}đ</button></div>`;
+    }
+
+    function openModal() { document.getElementById('full-key-modal').style.display='block'; }
+    function closeModal() { document.getElementById('full-key-modal').style.display='none'; }
+    function logout(){ location.reload(); }
+
+    render('ngay', 'list-ngay', 20000, 'Gói Ngày', false);
+    render('tuan', 'list-tuan', 40000, 'Gói Tuần', false);
+    render('thang', 'list-thang', 80000, 'Gói Tháng', false);
+    render('nam', 'list-nam', 300000, 'Gói Năm', false);
+    render('r1', 'list-r-tuan', 20000, 'Random Tuần', true, 11, 'tuan');
+    render('r2', 'list-r-thang', 40000, 'Random Tháng', true, 10, 'thang');
+    render('r3', 'list-r-nam', 70000, 'Random Năm', true, 50, 'nam');
+
+</script>
+</body>
+</html>
